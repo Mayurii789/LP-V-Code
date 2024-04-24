@@ -1,0 +1,83 @@
+#include <stdio.h>
+
+#define N 1024
+#define BLOCK_SIZE 16
+
+__global__ void matrixMultiply(int *a, int *b, int *c, int width) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (col < width && row < width) {
+        int sum = 0;
+        for (int i = 0; i < width; ++i) {
+            sum += a[row * width + i] * b[i * width + col];
+        }
+        c[row * width + col] = sum;
+    }
+}
+
+int main() {
+    int *a, *b, *c;
+    int *d_a, *d_b, *d_c;
+    int size = N * N * sizeof(int);
+
+    // Allocate memory on host
+    a = (int*)malloc(size);
+    b = (int*)malloc(size);
+    c = (int*)malloc(size);
+
+    // Initialize matrices
+    for (int i = 0; i < N * N; ++i) {
+        a[i] = i;
+        b[i] = i * 2;
+    }
+
+    // Allocate memory on device
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    // Copy matrices from host to device
+    cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, size, cudaMemcpyHostToDevice);
+
+    // Set grid and block sizes
+    dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
+    dim3 gridSize((N + BLOCK_SIZE - 1) / BLOCK_SIZE, (N + BLOCK_SIZE - 1) / BLOCK_SIZE);
+
+    // Launch kernel
+    matrixMultiply<<<gridSize, blockSize>>>(d_a, d_b, d_c, N);
+
+    // Copy result from device to host
+    cudaMemcpy(c, d_c, size, cudaMemcpyDeviceToHost);
+
+    // Verify the result
+    printf("Result Matrix:\n");
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < 5; ++j) {
+            printf("%d ", c[i * N + j]);
+        }
+        printf("\n");
+    }
+
+    // Free device memory
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+
+    // Free host memory
+    free(a);
+    free(b);
+    free(c);
+
+    return 0;
+}
+*********************************
+
+Output: 
+Result Matrix:
+0 0 0 0 0 
+0 2097152 4194304 6291456 8388608 
+0 4194304 8388608 12582912 16777216 
+0 6291456 12582912 18874368 25165824 
+0 8388608 16777216 25165824 33554432 

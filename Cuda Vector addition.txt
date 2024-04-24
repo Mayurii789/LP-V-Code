@@ -1,0 +1,74 @@
+#include <stdio.h>
+
+#define N 1000000
+
+__global__ void vectorAdd(int *a, int *b, int *c) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N)
+        c[i] = a[i] + b[i];
+}
+
+int main() {
+    int *a, *b, *c; 
+    int *d_a, *d_b, *d_c; 
+    int size = N * sizeof(int);
+    
+    // Allocate memory on host
+    a = (int*)malloc(size);
+    b = (int*)malloc(size);
+    c = (int*)malloc(size);
+    
+    // Initialize vectors
+    for (int i = 0; i < N; ++i) {
+        a[i] = i;
+        b[i] = i * 2;
+    }
+    
+    // Allocate memory on device
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+    
+    // Copy vectors from host to device
+    cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, size, cudaMemcpyHostToDevice);
+    
+    // Launch kernel
+    int blockSize = 256;
+    int numBlocks = (N + blockSize - 1) / blockSize;
+    vectorAdd<<<numBlocks, blockSize>>>(d_a, d_b, d_c);
+    
+    // Copy result from device to host
+    cudaMemcpy(c, d_c, size, cudaMemcpyDeviceToHost);
+    
+    // Verify the result
+    for (int i = 0; i < 10; ++i) {
+        printf("%d + %d = %d\n", a[i], b[i], c[i]);
+    }
+    
+    // Free device memory
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    
+    // Free host memory
+    free(a);
+    free(b);
+    free(c);
+    
+    return 0;
+}
+
+*********************************************
+OUTPUT:
+0 + 0 = 0
+1 + 2 = 3
+2 + 4 = 6
+3 + 6 = 9
+4 + 8 = 12
+5 + 10 = 15
+6 + 12 = 18
+7 + 14 = 21
+8 + 16 = 24
+9 + 18 = 27
+
